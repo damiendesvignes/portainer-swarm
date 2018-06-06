@@ -1,0 +1,61 @@
+version: '3'
+
+services:
+  agent:
+    image: portainer/agent
+    environment:
+      # REQUIRED: Should be equal to the service name prefixed by "tasks." when
+      # deployed inside an overlay network
+      AGENT_CLUSTER_ADDR: tasks.agent
+      # AGENT_PORT: 9001
+      # LOG_LEVEL: debug
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - portainer
+    deploy:
+      mode: global
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 64M
+        reservations:
+          cpus: '0.50'
+          memory: 32M
+
+  master:
+    image: portainer/portainer
+    command: -H tcp://tasks.agent:9001 --tlsskipverify
+    ports:
+      - "9000:9000"
+    volumes:
+      - /data:/data
+    networks:
+      - portainer
+      - traefik
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == worker
+      labels:
+        - "traefik.port=9000"
+        - "traefik.backend=master"
+        - "traefik.frontend.rule=Host:portainer.damiendesvignes.com"
+        - "traefik.docker.network=traefik"
+        - "traefik.enable=true"
+      resources:
+        limits:
+          cpus: '1'
+          memory: 128M
+        reservations:
+          cpus: '0.50'
+          memory: 32M
+
+
+networks:
+  portainer:
+    external: true
+  traefik:
+    external: true
